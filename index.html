@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coffee Lake - Online Order System</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f0f4f0; margin: 0; padding: 0; display: flex; justify-content: center; }
+        
+        .app-container {
+            width: 100%; max-width: 480px; min-height: 100vh; background-color: #d1d8d0;
+            display: flex; flex-direction: column; box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background-color: #c0d8b8; border-bottom: 2px solid #a3c49a; }
+        .header-title { font-size: 24px; font-weight: bold; font-style: italic; color: #1a3311; display: flex; align-items: center; gap: 8px; }
+        .cart-btn { background: #27ae60; color: white; border: none; padding: 8px 14px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+
+        .search-container { padding: 12px 20px; }
+        .search-bar { width: 100%; padding: 10px 15px; border-radius: 20px; border: 1px solid #888; background: #fff; font-size: 14px; outline: none; }
+
+        .screen-content { flex: 1; padding: 0 20px 20px; overflow-y: auto; }
+
+        .category-block { background-color: #c0d8b8; border: 2px solid #4a6b40; border-radius: 12px; padding: 12px; margin-bottom: 15px; }
+        .category-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #1a3311; border-bottom: 1px solid #a3c49a; padding-bottom: 5px; }
+        .menu-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #8fae85; font-size: 14px; }
+        .menu-row:last-child { border-bottom: none; }
+        .add-btn { background: #fff; border: 2px solid #e74c3c; color: #e74c3c; border-radius: 50%; width: 26px; height: 26px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+        .order-card { background: #fff; border-radius: 8px; padding: 15px; border: 1px solid #aaa; font-size: 13px; }
+        .order-title { text-align: center; font-weight: bold; font-size: 16px; border-bottom: 2px solid #222; padding-bottom: 6px; margin-bottom: 10px; }
+        .order-table { width: 100%; border-collapse: collapse; }
+        .order-table td { padding: 5px 0; }
+        .notes-row { font-size: 11px; color: #666; padding-left: 10px; }
+        .total-row { border-top: 1px solid #222; font-weight: bold; font-size: 14px; }
+
+        .loyalty-card { background-color: #27ae60; border-radius: 12px; padding: 12px; margin: 15px 0; color: #fff; }
+        .loyalty-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-bottom: 10px; }
+        .stamps-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; justify-items: center; }
+        .stamp { width: 36px; height: 36px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #333; font-size: 18px; }
+        .stamp.filled { background: #d4ac0d; color: #fff; }
+
+        .status-box { background: #e2ebe0; border: 1px solid #888; border-radius: 8px; padding: 12px; text-align: center; font-size: 13px; margin-bottom: 15px; }
+        .status-step { margin: 6px 0; color: #888; }
+        .status-step.active { color: #2c3e50; font-weight: bold; }
+
+        .pay-btn { width: 100%; background: #e74c3c; color: white; border: none; padding: 14px; font-weight: bold; font-size: 18px; border-radius: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <div class="header-title">👤 Coffee Lake</div>
+        <button class="cart-btn" onclick="toggleScreen()" id="navBtn">
+            🛒 <span id="cartCount">0</span>
+        </button>
+    </div>
+
+    <!-- SCREEN 1: MENU -->
+    <div id="menuScreen" class="screen-content">
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-bar" placeholder="🔍 search menu..." oninput="handleSearch()">
+        </div>
+        <div id="menuContainer">
+            <p style="text-align: center;">Loading menu from PostgreSQL...</p>
+        </div>
+    </div>
+
+    <!-- SCREEN 2: ORDER & PAYMENT -->
+    <div id="orderScreen" class="screen-content" style="display: none;">
+        <h3 style="text-align: center; margin: 10px 0;">🚫 YOUR ORDER</h3>
+        
+        <div class="order-card">
+            <div class="order-title" id="orderHeader">ORDER PREVIEW</div>
+            <table class="order-table" id="cartTable">
+                <tr><td colspan="2" align="center">No items in cart</td></tr>
+            </table>
+        </div>
+
+        <div class="loyalty-card">
+            <div class="loyalty-header">
+                <span>AITU</span>
+                <span>GIFT CARD (7th Free)</span>
+            </div>
+            <div class="stamps-grid">
+                <div class="stamp filled">☕</div>
+                <div class="stamp"></div><div class="stamp"></div><div class="stamp"></div>
+                <div class="stamp"></div><div class="stamp"></div><div class="stamp">🎁</div>
+            </div>
+        </div>
+
+        <div class="status-box">
+            <div class="status-step active" id="st1">☑ Order created</div>
+            <div class="status-step" id="st2">☐ Paid</div>
+            <div class="status-step" id="st3">☐ Preparing</div>
+            <div class="status-step" id="st4">☐ Ready for picking up</div>
+        </div>
+
+        <button class="pay-btn" onclick="submitOrder()">PAY WITH KASPI</button>
+    </div>
+</div>
+
+<script>
+    let currentCart = [];
+    let currentTotal = 0;
+    let searchTimeout = null;
+
+    async function fetchMenu(searchQuery = '') {
+        try {
+            const url = searchQuery ? `/api/menu?search=${encodeURIComponent(searchQuery)}` : '/api/menu';
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if (data.success) {
+                renderMenu(data.data);
+            } else {
+                document.getElementById('menuContainer').innerHTML = `<p style="color:red; text-align:center;">Error: ${data.error}</p>`;
+            }
+        } catch (err) {
+            console.error("Error loading menu:", err);
+            document.getElementById('menuContainer').innerHTML = `<p style="color:red; text-align:center;">Failed to connect to server</p>`;
+        }
+    }
+
+    function handleSearch() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            const query = document.getElementById('searchInput').value;
+            fetchMenu(query);
+        }, 300);
+    }
+
+    function renderMenu(items) {
+        const container = document.getElementById('menuContainer');
+        container.innerHTML = '';
+
+        if (!items || items.length === 0) {
+            container.innerHTML = '<p style="text-align:center;">No menu items found</p>';
+            return;
+        }
+
+        const categories = {};
+        items.forEach(item => {
+            const catName = item.category_name || 'Other';
+            if (!categories[catName]) categories[catName] = [];
+            categories[catName].push(item);
+        });
+
+        for (const [catName, catItems] of Object.entries(categories)) {
+            let html = `
+                <div class="category-block">
+                    <div class="category-title">☕ ${catName}:</div>
+            `;
+            catItems.forEach(item => {
+                html += `
+                    <div class="menu-row">
+                        <div>
+                            <strong>${item.name}</strong> 
+                            ${item.volume_ml ? `(${item.volume_ml}ml)` : ''} - 
+                            <strong>${item.price_kzt}tg</strong>
+                        </div>
+                        <button class="add-btn" onclick="addToCart(${item.item_id}, '${item.name}', ${item.price_kzt})">+</button>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            container.innerHTML += html;
+        }
+    }
+
+    function addToCart(id, name, price) {
+        currentCart.push({ itemId: id, name: name, price: parseFloat(price) });
+        currentTotal += parseFloat(price);
+        document.getElementById('cartCount').innerText = currentCart.length;
+        alert(`Added ${name} to order!`);
+    }
+
+    function toggleScreen() {
+        const menuScr = document.getElementById('menuScreen');
+        const orderScr = document.getElementById('orderScreen');
+        const navBtn = document.getElementById('navBtn');
+
+        if (menuScr.style.display === 'none') {
+            menuScr.style.display = 'block';
+            orderScr.style.display = 'none';
+            navBtn.innerHTML = `🛒 <span id="cartCount">${currentCart.length}</span>`;
+        } else {
+            menuScr.style.display = 'none';
+            orderScr.style.display = 'block';
+            navBtn.innerHTML = `🏠 Menu`;
+            updateOrderView();
+        }
+    }
+
+    function updateOrderView() {
+        const table = document.getElementById('cartTable');
+        if (currentCart.length > 0) {
+            let rowsHtml = '';
+            currentCart.forEach(item => {
+                rowsHtml += `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td align="right">${item.price}tg</td>
+                    </tr>
+                    <tr class="notes-row"><td colspan="2">+extra sugar 2x</td></tr>
+                `;
+            });
+            rowsHtml += `
+                <tr><td colspan="2"><hr></td></tr>
+                <tr class="total-row">
+                    <td>Total:</td>
+                    <td align="right">${currentTotal}tg</td>
+                </tr>
+                <tr><td>Gift card:</td><td align="right">+1</td></tr>
+                <tr><td>Pay:</td><td align="right">Kaspi Gold</td></tr>
+            `;
+            table.innerHTML = rowsHtml;
+        }
+    }
+
+    async function submitOrder() {
+        if (currentCart.length === 0) {
+            currentCart = [{ itemId: 1, name: 'Ice Latte', price: 1000 }];
+            currentTotal = 1000;
+        }
+
+        try {
+            const res = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: 1,
+                    items: currentCart,
+                    totalPrice: currentTotal,
+                    customizationNotes: 'extra sugar 2x, chocolate syrup'
+                })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('orderHeader').innerText = `ORDER #${data.orderId}`;
+                document.getElementById('st1').className = 'status-step active';
+                document.getElementById('st1').innerText = '☑ Order created';
+                document.getElementById('st2').className = 'status-step active';
+                document.getElementById('st2').innerText = '☑ Paid';
+                document.getElementById('st3').className = 'status-step active';
+                document.getElementById('st3').innerText = '☑ Preparing';
+                
+                alert(`Order #${data.orderId} successfully saved to PostgreSQL!`);
+            }
+        } catch (err) {
+            alert('Error submitting order to database');
+        }
+    }
+
+    fetchMenu();
+</script>
+
+</body>
+</html>
